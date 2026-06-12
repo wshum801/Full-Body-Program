@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Workout Log">
+<title>Workout Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #1a1a1d;
+    --surface2: #232327;
+    --border: #2e2e33;
+    --text: #f2f2f0;
+    --text-secondary: #9a9a9f;
+    --text-tertiary: #6e6e74;
+    --accent: #4f8ef7;
+    --accent-text: #bcd6ff;
+    --danger: #e2504a;
+    --success: #7fc25b;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 70px);
+  }
+  #app { max-width: 600px; margin: 0 auto; padding: 1rem 1rem 0; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0.5rem 0 1rem; }
+  h2 { font-size: 16px; font-weight: 600; margin: 0 0 0.5rem; }
+  p { line-height: 1.5; }
+
+  /* Bottom tab nav */
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 10;
+  }
+  .tabbar button {
+    flex: 1; background: none; border: none; color: var(--text-secondary);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 10px 0 8px; font-size: 11px; font-family: inherit;
+  }
+  .tabbar button.active { color: var(--accent); }
+  .tabbar svg { width: 22px; height: 22px; }
+
+  /* Selectors */
+  .row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .field { flex: 1; }
+  label { font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+  select, input, textarea, button.action {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius-md); padding: 10px 12px;
+    font-size: 15px; font-family: inherit; -webkit-appearance: none; appearance: none;
+  }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%239a9a9f'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px; }
+  textarea { resize: vertical; min-height: 70px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+  /* Banner */
+  .banner {
+    background: var(--surface); border-radius: var(--radius-md);
+    padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: var(--text-secondary);
+  }
+  .banner strong { color: var(--text); font-weight: 600; }
+
+  /* Exercise cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 12px;
+  }
+  .card .ex-name { font-weight: 600; font-size: 15px; margin: 0; }
+  .card .ex-meta { font-size: 13px; color: var(--text-secondary); margin: 2px 0 0; }
+  .card .ex-notes { font-size: 13px; color: var(--text-tertiary); margin: 8px 0 10px; }
+  .card .ex-prev { font-size: 12px; color: var(--accent-text); margin: 0 0 10px; background: var(--surface2); border-radius: var(--radius-md); padding: 6px 10px; display: inline-block; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .grid3 label { font-size: 11px; }
+  .grid3 input { padding: 8px 10px; font-size: 14px; }
+
+  /* Buttons */
+  button.action {
+    background: var(--accent); color: #fff; border: none; font-weight: 600;
+    text-align: center; cursor: pointer; margin-bottom: 12px;
+  }
+  button.action:active { opacity: 0.8; }
+  button.action.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  button.action svg { vertical-align: -3px; margin-right: 6px; width: 16px; height: 16px; }
+
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: var(--surface); border-radius: var(--radius-md); padding: 12px 14px; }
+  .stat .label { font-size: 12px; color: var(--text-secondary); }
+  .stat .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+
+  .chart-wrap { position: relative; height: 240px; margin-bottom: 1rem; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin-bottom: 1rem; }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+
+  textarea#ai-output {
+    width: 100%; min-height: 200px; background: var(--surface2);
+    border-radius: var(--radius-md); padding: 12px; font-size: 13px;
+    color: var(--text); border: 1px solid var(--border); white-space: pre-wrap;
+  }
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: var(--surface2); color: var(--text); padding: 8px 16px;
+    border-radius: var(--radius-md); font-size: 13px; border: 1px solid var(--border);
+    opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20;
+  }
+  .toast.show { opacity: 1; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Full body 5x/week tracker</h1>
+
+  <!-- LOG VIEW -->
+  <div class="view active" id="view-log">
+    <div class="row">
+      <div class="field">
+        <label for="week-select">Week</label>
+        <select id="week-select"></select>
+      </div>
+      <div class="field" style="flex: 2;">
+        <label for="day-select">Workout day</label>
+        <select id="day-select"></select>
+      </div>
+    </div>
+    <div class="banner" id="week-banner"></div>
+    <div id="exercise-list"></div>
+    <h2 style="margin-top: 1.5rem;">Session notes</h2>
+    <textarea id="session-notes" placeholder="How did the session feel overall? Energy, sleep, soreness, etc."></textarea>
+  </div>
+
+  <!-- PROGRESS VIEW -->
+  <div class="view" id="view-progress">
+    <h1>Progress</h1>
+    <div class="stat-grid" id="onerm-grid"></div>
+    <div id="progress-empty" class="banner" style="display:none;">Log weights for squat, bench, deadlift, or OHP on the Log tab to see your progress chart here.</div>
+    <div class="chart-wrap" id="chart-wrap" style="display:none;">
+      <canvas id="progress-chart"></canvas>
+    </div>
+  </div>
+
+  <!-- AI VIEW -->
+  <div class="view" id="view-ai">
+    <h1>AI coach</h1>
+    <p style="font-size:14px; color: var(--text-secondary);">
+      Copy your logged training data, then paste it into a Claude chat to get personalized suggestions for your next sessions (load, reps, RPE adjustments).
+    </p>
+    <button class="action" id="copy-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      Copy training data
+    </button>
+    <textarea id="ai-output" readonly></textarea>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="tabbar">
+  <button class="tab-btn active" data-view="log">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Log
+  </button>
+  <button class="tab-btn" data-view="progress">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+    Progress
+  </button>
+  <button class="tab-btn" data-view="ai">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7V17h8v-2.3A7 7 0 0012 2z"/></svg>
+    AI coach
+  </button>
+</div>
+
+<script>
+// ---------------- PROGRAM DATA ----------------
+const ONE_RMS = { Squat: 225, Bench: 185, Deadlift: 315, OHP: 115 };
+
+const DAY_ORDER = [
+  'Lower Focused Full Body',
+  'Chest Focused Full Body',
+  'Back Focused Full Body',
+  'Lower Focused Full Body 2',
+  'Deltoid Focused Full Body',
+];
+
+const PROGRAM_DAYS = {
+  'Lower Focused Full Body': [
+    { name: 'Barbell Back Squat', sets: 4, reps: '4', target: '175 lbs @ 77.5%', notes: 'Sit back and down, 15° toe flare, drive knees out laterally' },
+    { name: 'Dumbbell Incline Press', sets: 3, reps: '8', target: '80 lbs @ RPE8', notes: '~45° incline, mind-muscle connection with upper pecs' },
+    { name: 'Lying Leg Curl', sets: 3, reps: '10', target: '70 lbs @ RPE6', notes: 'Focus on squeezing your hamstrings to move the weight' },
+    { name: 'Lat Pulldown', sets: 3, reps: '10', target: '120 lbs @ RPE7', notes: 'Pull your elbows down and in' },
+    { name: 'EZ Bar Curl (dropset)', sets: 3, reps: '15/15', target: '40/20 lbs @ RPE9', notes: 'Drop weight ~50% on 2nd set of 15, 30 reps total' },
+    { name: 'Hanging Leg Raise', sets: 3, reps: '12', target: 'RPE7', notes: 'Roll hips up as you squeeze lower abs, avoid swinging' },
+  ],
+  'Chest Focused Full Body': [
+    { name: 'Barbell Bench Press', sets: 3, reps: '3', target: '155 lbs @ 85%', notes: 'Comfortable arch, 1-2s pause on chest, explode off chest' },
+    { name: 'Low to High Cable Flye', sets: 3, reps: '15', target: '10 lbs @ RPE8', notes: 'Pull elbows up and in while rotating palms to floor' },
+    { name: 'DB RDL', sets: 3, reps: '12', target: '40 lbs @ RPE6', notes: 'Hip thrust or RDL based on priority; mind-muscle connection' },
+    { name: 'Chest-Supported T-Bar Row', sets: 3, reps: '15', target: '90 lbs @ RPE6', notes: 'Squeeze shoulder blades at top, round forward at bottom' },
+    { name: 'Seated DB Shoulder Press', sets: 3, reps: '10', target: '30 lbs @ RPE7', notes: 'Avoid flaring elbows out, tuck 30-40°' },
+    { name: 'Rope Tricep Pressdown', sets: 3, reps: '15', target: '35 lbs @ RPE7', notes: 'Lean forward 30-45°, squeeze triceps at bottom' },
+    { name: 'DB Shrug', sets: 3, reps: '12', target: '45 lbs @ RPE6', notes: 'Shrug up and in, pull shoulders to ears' },
+  ],
+  'Back Focused Full Body': [
+    { name: 'Weighted Pull-Up', sets: 3, reps: '6', target: '+5 lbs @ RPE8', notes: '1.5x shoulder width grip, pull chest to bar' },
+    { name: 'Humble Row', sets: 3, reps: '10', target: '45s @ RPE8', notes: 'Pin lower chest against top of incline bench' },
+    { name: 'Leg Press', sets: 3, reps: '15', target: '3 plates @ RPE6', notes: "Low/med/high foot placement, don't round lower back" },
+    { name: 'Standing Calf Raise', sets: 4, reps: '8', target: '3 plates @ RPE7', notes: '1-2s pause at the bottom of each rep' },
+    { name: 'Cable Rope Upright Row', sets: 3, reps: '10', target: '75 lbs @ RPE7', notes: 'Squeeze upper traps at the top' },
+    { name: 'Hammer Curl', sets: 3, reps: '8', target: '30 lbs @ RPE9', notes: '3s eccentric, arch dumbbell out not up' },
+  ],
+  'Lower Focused Full Body 2': [
+    { name: 'Deadlift', sets: 4, reps: '2', target: '270 lbs @ 85%', notes: 'Brace lats, chest tall, hips high, pull slack before moving bar' },
+    { name: 'Weighted Dip', sets: 3, reps: '10', target: '+7 lbs BW @ RPE8', notes: 'Tuck elbows 45°, lean torso forward 15°' },
+    { name: 'Lying Leg Curl', sets: 3, reps: '10', target: '145 lbs @ RPE6', notes: 'Focus on squeezing your hamstrings' },
+    { name: 'Leg Extension', sets: 3, reps: '15', target: '190 lbs @ RPE7', notes: 'Squeeze quads, point toes slightly inward' },
+    { name: 'Dumbbell Lateral Raise', sets: 3, reps: '20', target: '15 lbs @ RPE7', notes: 'Raise out not up, mind-muscle with middle fibers' },
+    { name: 'Cable Pull-Over', sets: 3, reps: '15', target: '100 lbs @ RPE7', notes: 'Lean torso 45°, pull straight down not in' },
+    { name: 'Rope Face Pull', sets: 3, reps: '20', target: '120 lbs @ RPE7', notes: 'Pull elbows up and out, squeeze shoulder blades' },
+    { name: 'Overhead Rope Tricep Ext.', sets: 3, reps: '15', target: '90 lbs @ RPE7', notes: 'Head height, lean forward 45°, overhead extension' },
+  ],
+  'Deltoid Focused Full Body': [
+    { name: 'Barbell Overhead Press', sets: 4, reps: '6', target: '85 lbs @ 75%', notes: 'Squeeze glutes, torso upright, press up and slightly back' },
+    { name: 'Cable Lateral Raise', sets: 3, reps: '8', target: '12.5 lbs @ RPE8', notes: '2s eccentric, squeeze delts' },
+    { name: 'Narrow Grip Cable Seated Row', sets: 3, reps: '12', target: '130 lbs @ RPE7', notes: 'Squeeze shoulder blades, elbows down and in' },
+    { name: 'Seated Hip Abduction', sets: 3, reps: '20', target: '100 lbs @ RPE7', notes: 'Lean forward, back straight, drive knees out' },
+    { name: 'Incline Dumbbell Curl', sets: 2, reps: '10', target: '30 lbs @ RPE8', notes: 'Brace upper back, 45° incline, shoulders back' },
+    { name: 'Standing Calf Raise', sets: 4, reps: '12', target: '3 plates @ RPE7', notes: 'Press onto toes' },
+    { name: 'Bicycle Crunch', sets: 3, reps: '15', target: '20 lbs @ RPE7', notes: 'Flex and rotate spine, elbow to opposite knee' },
+    { name: 'Push Up', sets: 2, reps: 'AMRAP', target: '@ RPE6', notes: 'Max reps to hit target RPE' },
+  ],
+};
+
+const PROGRESSION_HINTS = {
+  1: 'Block 1: Hypertrophy. Follow the targets shown for each exercise this week.',
+  2: 'Block 1: Hypertrophy. Squat 6 reps @ 77.5%, bench 5 reps @ 80%, deadlift 5 reps @ 80%, OHP volume up to 10 reps @ 65%.',
+  3: 'Block 1: Hypertrophy. Squat back to 4 reps @ 80%, bench 3 reps @ 85%, deadlift 2 reps @ 87.5%, OHP 6 reps @ 77.5%.',
+  4: 'Block 1: Hypertrophy. Squat 5 reps @ 80%, bench 5 reps @ 80%, deadlift 5 reps @ 80%, OHP volume 10 reps @ 67.5%. End of block.',
+  5: 'Block 2: Strength. Top set + back-off set structure begins for squat & deadlift. Squat topset 3-5 @ 87.5%, deadlift topset 2 @ 90%, OHP 6 @ 80%. New exercises: Chin-Up, Decline Bench, Single-Leg Leg Press.',
+  6: 'Block 2: Strength. Squat topset 2 @ 90%, back-off 3 @ 85%. Deadlift topset 4 @ 85%, back-off 4 @ 75%. OHP 8 @ 75% then 4 @ 82.5%.',
+  7: 'Block 2: Strength. Squat topset 6-8 @ 80%, back-off 8 @ 70%. Deadlift topset 6 @ 80%, back-off 6 @ 70%. Bench 10 reps @ 75%. OHP 6 @ 80%.',
+  8: 'Block 2: Strength (peak week). Squat topset 2 @ 92.5%, back-off 2 @ 85%. Bench 2 reps @ 90%. Deadlift topset 2 @ 95%, back-off 3 @ 85%. OHP 3 reps @ 87.5% (5 sets).',
+  9: 'Block 3: Deload. Lighter loads (70-80%), speed/explosive reps on squat, bench, deadlift. RPE6 throughout accessories.',
+  10: 'Block 3: AMRAP testing. Squat, bench, deadlift AMRAP @ 90%, followed by back-off sets. Use these to estimate new 1RMs.',
+};
+
+const TOTAL_WEEKS = 10;
+const LIFT_EXERCISES = {
+  'Barbell Back Squat': 'Squat',
+  'Barbell Bench Press': 'Bench',
+  'Deadlift': 'Deadlift',
+  'Barbell Overhead Press': 'OHP',
+};
+const LIFT_COLORS = { Squat: '#4f8ef7', Bench: '#e2796a', Deadlift: '#7fc25b', OHP: '#b08ef0' };
+
+// ---------------- STORAGE ----------------
+const LOGS_KEY = 'workout-logs-v1';
+const NOTES_KEY = 'workout-notes-v1';
+
+function loadLogs() {
+  try { return JSON.parse(localStorage.getItem(LOGS_KEY)) || {}; } catch { return {}; }
+}
+function saveLogs(logs) {
+  localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
+}
+function loadNotes() {
+  try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || {}; } catch { return {}; }
+}
+function saveNotes(notes) {
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+}
+
+let logs = loadLogs();
+let notes = loadNotes();
+
+// ---------------- STATE ----------------
+let selectedWeek = 1;
+let selectedDay = DAY_ORDER[0];
+let chartInstance = null;
+
+// ---------------- INIT ----------------
+function init() {
+  const weekSelect = document.getElementById('week-select');
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const opt = document.createElement('option');
+    opt.value = w; opt.textContent = 'Week ' + w;
+    weekSelect.appendChild(opt);
+  }
+  const daySelect = document.getElementById('day-select');
+  DAY_ORDER.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = d;
+    daySelect.appendChild(opt);
+  });
+
+  weekSelect.addEventListener('change', e => { selectedWeek = Number(e.target.value); renderLog(); });
+  daySelect.addEventListener('change', e => { selectedDay = e.target.value; renderLog(); });
+
+  document.getElementById('session-notes').addEventListener('input', e => {
+    const key = dayKey();
+    notes[key] = e.target.value;
+    saveNotes(notes);
+  });
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', copyTrainingData);
+
+  renderLog();
+  renderProgress();
+}
+
+function dayKey() {
+  return selectedWeek + '_' + selectedDay;
+}
+
+function getPreviousEntry(exerciseName) {
+  for (let w = selectedWeek - 1; w >= 1; w--) {
+    const key = w + '_' + selectedDay;
+    const dayLogs = logs[key];
+    if (dayLogs && dayLogs[exerciseName]) {
+      const entry = dayLogs[exerciseName];
+      if (entry.weight || entry.reps || entry.rpe) {
+        return { week: w, entry };
+      }
+    }
+  }
+  return null;
+}
+
+// ---------------- LOG VIEW ----------------
+function renderLog() {
+  const plan = PROGRAM_DAYS[selectedDay];
+  const banner = document.getElementById('week-banner');
+  banner.innerHTML = '<strong>Week ' + selectedWeek + '</strong> &mdash; ' + (PROGRESSION_HINTS[selectedWeek] || '');
+
+  const list = document.getElementById('exercise-list');
+  list.innerHTML = '';
+  const key = dayKey();
+  const dayLogs = logs[key] || {};
+
+  plan.forEach((ex, i) => {
+    const entry = dayLogs[ex.name] || {};
+    const prev = getPreviousEntry(ex.name);
+    let prevHtml = '';
+    if (prev) {
+      const parts = [];
+      if (prev.entry.weight) parts.push(prev.entry.weight + ' lbs');
+      if (prev.entry.reps) parts.push(prev.entry.reps + ' reps');
+      if (prev.entry.rpe) parts.push('RPE ' + prev.entry.rpe);
+      prevHtml = `<p class="ex-prev">Week ${prev.week}: ${escapeHtml(parts.join(' · '))}</p>`;
+    }
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <p class="ex-name">${escapeHtml(ex.name)}</p>
+      <p class="ex-meta">${ex.sets} sets x ${ex.reps} reps &middot; target ${escapeHtml(ex.target)}</p>
+      <p class="ex-notes">${escapeHtml(ex.notes)}</p>
+      ${prevHtml}
+      <div class="grid3">
+        <div>
+          <label>Weight</label>
+          <input type="number" inputmode="decimal" placeholder="lbs" data-field="weight" value="${entry.weight ? escapeHtml(entry.weight) : ''}">
+        </div>
+        <div>
+          <label>Reps</label>
+          <input type="text" placeholder="actual" data-field="reps" value="${entry.reps ? escapeHtml(entry.reps) : ''}">
+        </div>
+        <div>
+          <label>RPE</label>
+          <input type="text" placeholder="1-10" data-field="rpe" value="${entry.rpe ? escapeHtml(entry.rpe) : ''}">
+        </div>
+      </div>
+      <div>
+        <label>Notes</label>
+        <input type="text" placeholder="form cues, substitutions, how it felt..." data-field="notes" value="${entry.notes ? escapeHtml(entry.notes) : ''}">
+      </div>
+    `;
+    card.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', e => {
+        const field = e.target.dataset.field;
+        const val = e.target.value;
+        if (!logs[key]) logs[key] = {};
+        if (!logs[key][ex.name]) logs[key][ex.name] = {};
+        logs[key][ex.name][field] = val;
+        saveLogs(logs);
+        if (field === 'weight') renderProgress();
+      });
+    });
+    list.appendChild(card);
+  });
+
+  document.getElementById('session-notes').value = notes[key] || '';
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ---------------- PROGRESS VIEW ----------------
+function renderProgress() {
+  const grid = document.getElementById('onerm-grid');
+  grid.innerHTML = '';
+  Object.entries(ONE_RMS).forEach(([lift, val]) => {
+    const stat = document.createElement('div');
+    stat.className = 'stat';
+    stat.innerHTML = `<div class="label">${lift} 1RM</div><div class="value">${val} lbs</div>`;
+    grid.appendChild(stat);
+  });
+
+  const rows = [];
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const row = { week: 'W' + w };
+    let hasData = false;
+    DAY_ORDER.forEach(day => {
+      const key = w + '_' + day;
+      const dayLogs = logs[key];
+      if (!dayLogs) return;
+      Object.entries(LIFT_EXERCISES).forEach(([exName, short]) => {
+        const entry = dayLogs[exName];
+        if (entry && entry.weight) {
+          const v = parseFloat(entry.weight);
+          if (!isNaN(v)) { row[short] = v; hasData = true; }
+        }
+      });
+    });
+    if (hasData) rows.push(row);
+  }
+
+  const empty = document.getElementById('progress-empty');
+  const wrap = document.getElementById('chart-wrap');
+
+  if (rows.length === 0) {
+    empty.style.display = 'block';
+    wrap.style.display = 'none';
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    return;
+  }
+  empty.style.display = 'none';
+  wrap.style.display = 'block';
+
+  const labels = rows.map(r => r.week);
+  const datasets = Object.keys(LIFT_COLORS).map(lift => ({
+    label: lift,
+    data: rows.map(r => r[lift] !== undefined ? r[lift] : null),
+    borderColor: LIFT_COLORS[lift],
+    backgroundColor: LIFT_COLORS[lift],
+    spanGaps: true,
+    tension: 0.2,
+    pointRadius: 3,
+  }));
+
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#f2f2f0', font: { size: 12 } } },
+      },
+      scales: {
+        x: { ticks: { color: '#9a9a9f' }, grid: { color: '#2e2e33' } },
+        y: { ticks: { color: '#9a9a9f' }, grid: { color: '#2e2e33' } },
+      },
+    },
+  });
+}
+
+// ---------------- AI COPY ----------------
+function copyTrainingData() {
+  const lines = [];
+  for (let w = TOTAL_WEEKS; w >= 1; w--) {
+    DAY_ORDER.forEach(day => {
+      const key = w + '_' + day;
+      const dayLogs = logs[key];
+      if (!dayLogs) return;
+      const note = notes[key];
+      const dayLines = [];
+      Object.entries(dayLogs).forEach(([exName, entry]) => {
+        if (!entry || (!entry.weight && !entry.reps && !entry.rpe && !entry.notes)) return;
+        dayLines.push('  ' + exName + ': weight=' + (entry.weight || '-') + ', reps=' + (entry.reps || '-') + ', RPE=' + (entry.rpe || '-') + ', notes=' + (entry.notes || '-'));
+      });
+      if (dayLines.length > 0) {
+        lines.push('Week ' + w + ' - ' + day + (note ? ' (session notes: ' + note + ')' : ''));
+        lines.push(...dayLines);
+      }
+    });
+  }
+  const header = "Here is my logged training data from Jeff Nippard's Full Body 5x/Week program (most recent first). Based on weight, reps, RPE trends and notes, suggest load/rep/RPE adjustments for my next session of each exercise:\n\n";
+  const text = header + (lines.length > 0 ? lines.join('\n') : 'No logged data yet.');
+
+  document.getElementById('ai-output').value = text;
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied! Paste into a Claude chat.'))
+      .catch(() => showToast('Copy failed — select the text below manually.'));
+  } else {
+    showToast('Select the text below and copy manually.');
+  }
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ---------------- VIEW SWITCHING ----------------
+function switchView(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelector(`.tab-btn[data-view="${view}"]`).classList.add('active');
+  if (view === 'progress') renderProgress();
+}
+
+init();
+</script>
+</body>
+</html>
